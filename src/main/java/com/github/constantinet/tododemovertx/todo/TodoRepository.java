@@ -38,4 +38,11 @@ public class TodoRepository {
                 .rxInsert("todos", todoJsonObject)
                 .map(id -> new Todo(id, todo.getDescription()));
     }
+
+    public Single<Void> delete(final String id) {
+        final JsonObject query = new JsonObject().put(Todo.ID, id);
+
+        return mongoClient
+                .rxRemove("todos", query);
+    }
 }

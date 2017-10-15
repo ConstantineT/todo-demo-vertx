@@ -21,6 +21,7 @@ import io.vertx.rxjava.ext.web.client.HttpResponse;
 import io.vertx.rxjava.ext.web.client.WebClient;
 import org.junit.*;
 import org.junit.runner.RunWith;
+import rx.Single;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -43,7 +44,8 @@ public class TodoVerticleTest {
     private MongoClient mongoClient;
     private WebClient webClient;
 
-    private Todo todo;
+    private Todo todo1;
+    private Todo todo2;
 
     @BeforeClass
     public static void setUpInfrastructure() throws IOException {
@@ -74,11 +76,15 @@ public class TodoVerticleTest {
                         .setDefaultPort(HTTP_PORT)
                         .setDefaultHost(HOST));
 
-        todo = new Todo("1", "Order pizza");
+        todo1 = new Todo("1", "Order pizza");
+        todo2 = new Todo("2", "Eat pizza");
 
         mongoClient.rxDropCollection(COLLECTION_NAME)
-                .flatMap(nothing -> mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo)))
-                .flatMap(id -> vertx.rxDeployVerticle(
+                .flatMap(nothing -> Single.zip(
+                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo1)),
+                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo2)),
+                        (id1, id2) -> (Void) null))
+                .flatMap(nothing -> vertx.rxDeployVerticle(
                         "java-guice:com.github.constantinet.tododemovertx.todo.TodoVerticle",
                         new DeploymentOptions()
                                 .setConfig(new JsonObject()
@@ -96,36 +102,45 @@ public class TodoVerticleTest {
     public void testGetTodo_shouldReturnCorrectJson_whenRequestWithExistingIdSent(final TestContext context) {
         final Async async = context.async();
 
-        webClient.get("/todo/" + todo.getId()).rxSend()
+        webClient.get("/todo/" + todo2.getId()).rxSend()
+                .doOnSuccess(response -> context.assertEquals(200, response.statusCode()))
                 .map(HttpResponse::bodyAsJsonObject)
-                .subscribe(
-                        actual -> {
-                            context.assertEquals(JsonObject.mapFrom(todo), actual);
-                            async.complete();
-                        },
-                        context::fail
-                );
+                .doOnSuccess(jsonObject -> context.assertEquals(JsonObject.mapFrom(todo2), jsonObject))
+                .subscribe(result -> async.complete(), context::fail);
     }
 
     @Test
     public void testCreateTodo_shouldReturnCorrectJsonAndCreateRecord_whenRequestWithCorrectBodySent(final TestContext context) {
         final Async async = context.async();
-        final String description = "Eat pizza";
+        final String description = "Take a nap";
 
         webClient.post("/todo").rxSendJsonObject(new JsonObject().put(Todo.DESCRIPTION, description))
+                .doOnSuccess(response -> context.assertEquals(200, response.statusCode()))
                 .map(HttpResponse::bodyAsJsonObject)
-                .flatMap(result -> {
-                    context.assertNotNull(result);
-                    context.assertEquals(description, result.getString(Todo.DESCRIPTION));
-                    return mongoClient.rxFindOne(COLLECTION_NAME, new JsonObject().put(Todo.ID, result.getString(Todo.ID)), null);
+                .doOnSuccess(jsonObject -> {
+                    context.assertNotNull(jsonObject);
+                    context.assertEquals(description, jsonObject.getString(Todo.DESCRIPTION));
                 })
-                .subscribe(
-                        result -> {
-                            context.assertNotNull(result);
-                            context.assertEquals(description, result.getString(Todo.DESCRIPTION));
-                            async.complete();
-                        },
-                        context::fail
-                );
+                .flatMap(result -> mongoClient.rxFindOne(COLLECTION_NAME, new JsonObject().put(Todo.ID, result.getString(Todo.ID)), null))
+                .doOnSuccess(jsonObject -> {
+                    context.assertNotNull(jsonObject);
+                    context.assertEquals(description, jsonObject.getString(Todo.DESCRIPTION));
+                })
+                .subscribe(result -> async.complete(), context::fail);
+    }
+
+    @Test
+    public void testDeleteTodo_shouldDeleteRecord_whenRequestWithExistingIdSent(final TestContext context) {
+        final Async async = context.async();
+
+        webClient.delete("/todo/" + todo1.getId()).rxSend()
+                .doOnSuccess(response -> context.assertEquals(200, response.statusCode()))
+                .flatMap(response -> mongoClient.rxFind(COLLECTION_NAME, new JsonObject()))
+                .doOnSuccess(jsonObjects -> {
+                    context.assertNotNull(jsonObjects);
+                    context.assertEquals(1, jsonObjects.size());
+                    context.assertEquals(JsonObject.mapFrom(todo2), jsonObjects.get(0));
+                })
+                .subscribe(result -> async.complete(), context::fail);
     }
 }

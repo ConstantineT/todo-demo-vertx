@@ -34,6 +34,7 @@ public class TodoVerticle extends AbstractVerticle {
         router.get("/todo").handler(this::getTodos);
         router.get("/todo/:id").handler(this::getTodo);
         router.post("/todo").handler(this::createTodo);
+        router.delete().path("/todo/:id").handler(this::deleteTodo);
 
         vertx.createHttpServer()
                 .requestHandler(router::accept)
@@ -89,6 +90,16 @@ public class TodoVerticle extends AbstractVerticle {
         final Todo todoToCreate = routingContext.getBodyAsJson().mapTo(Todo.class);
         todoRepository.insert(todoToCreate).subscribe(
                 todo -> response.setStatusCode(200).end(JsonObject.mapFrom(todo).encode()),
+                error -> response.setStatusCode(500).end()
+        );
+    }
+
+    private void deleteTodo(final RoutingContext routingContext) {
+        final HttpServerResponse response = routingContext.response();
+
+        final String id = routingContext.pathParam("id");
+        todoRepository.delete(id).subscribe(
+                todo -> response.setStatusCode(200).end(),
                 error -> response.setStatusCode(500).end()
         );
     }
