@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+    build_service:
+        build:
+          context: .
+        image: todo_service_vertx
+
+    mongodb:
+        container_name: todo_service_vertx_mongo
+        image: mongo:latest
+        ports:
+          - 27017:27017
+
+    start_service:
+        image: todo_service_vertx
+        command:
+          java -jar /usr/src/app/target/todo-service.jar -conf /usr/src/app/src/config/config-docker.json
+        ports:
+          - 8080:8080
+        links:
+          - mongodb
+        depends_on:
+          - build_service
+          - mongodb

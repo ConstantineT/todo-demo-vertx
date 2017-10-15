@@ -1,0 +1,9 @@
+{
+  "mongoConfig": {
+    "db_name": "test",
+    "host": "mongodb",
+    "port": 27017
+  },
+  "httpPort": 8080,
+  "guice_binder": "com.github.constantinet.tododemovertx.TodoModule"
+}
