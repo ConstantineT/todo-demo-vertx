@@ -1,5 +1,5 @@
 # Introduction
-This is a simple service for managing "Todo" tasks. The goal of this project is to demonstrate the Vert.x stack.
+This is a simple service for managing "Todo" tasks. The goal of this project is to demonstrate the Vert.x stack (updated to Vert.x 3.5.0).
   
 # How to run
   - `docker-compose up` to run the whole project

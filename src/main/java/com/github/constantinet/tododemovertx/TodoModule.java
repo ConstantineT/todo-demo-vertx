@@ -6,9 +6,9 @@ import com.google.inject.ConfigurationException;
 import com.google.inject.name.Names;
 import com.google.inject.spi.Message;
 import io.vertx.core.json.JsonObject;
-import io.vertx.rxjava.core.Context;
-import io.vertx.rxjava.core.Vertx;
-import io.vertx.rxjava.ext.mongo.MongoClient;
+import io.vertx.reactivex.core.Context;
+import io.vertx.reactivex.core.Vertx;
+import io.vertx.reactivex.ext.mongo.MongoClient;
 
 import java.util.Collections;
 

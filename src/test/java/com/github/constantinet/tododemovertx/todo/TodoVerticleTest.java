@@ -8,6 +8,7 @@ import de.flapdoodle.embed.mongo.config.MongodConfigBuilder;
 import de.flapdoodle.embed.mongo.config.Net;
 import de.flapdoodle.embed.mongo.distribution.Version;
 import de.flapdoodle.embed.process.runtime.Network;
+import io.reactivex.Completable;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.Async;
@@ -15,16 +16,17 @@ import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.RunTestOnContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import io.vertx.ext.web.client.WebClientOptions;
-import io.vertx.rxjava.core.Vertx;
-import io.vertx.rxjava.ext.mongo.MongoClient;
-import io.vertx.rxjava.ext.web.client.HttpResponse;
-import io.vertx.rxjava.ext.web.client.WebClient;
+import io.vertx.reactivex.core.Vertx;
+import io.vertx.reactivex.ext.mongo.MongoClient;
+import io.vertx.reactivex.ext.web.client.HttpResponse;
+import io.vertx.reactivex.ext.web.client.WebClient;
 import org.junit.*;
 import org.junit.runner.RunWith;
-import rx.Single;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+
+import static com.github.constantinet.tododemovertx.todo.TodoRepository.COLLECTION_NAME;
 
 @RunWith(VertxUnitRunner.class)
 public class TodoVerticleTest {
@@ -33,7 +35,6 @@ public class TodoVerticleTest {
     private static final int MONGO_PORT = 12345;
     private static final int HTTP_PORT = 12346;
     private static final String MONGO_DB_NAME = "test";
-    private static final String COLLECTION_NAME = "todos";
 
     private static JsonObject mongoConfig;
     private static MongodProcess mongoProcess;
@@ -80,22 +81,17 @@ public class TodoVerticleTest {
         todo2 = new Todo("2", "Eat pizza");
 
         mongoClient.rxDropCollection(COLLECTION_NAME)
-                .flatMap(nothing -> Single.zip(
-                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo1)),
-                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo2)),
-                        (id1, id2) -> (Void) null))
-                .flatMap(nothing -> vertx.rxDeployVerticle(
+                .concatWith(Completable.mergeArray(
+                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo1)).toCompletable(),
+                        mongoClient.rxInsert(COLLECTION_NAME, JsonObject.mapFrom(todo2)).toCompletable()))
+                .concatWith(vertx.rxDeployVerticle(
                         "java-guice:com.github.constantinet.tododemovertx.todo.TodoVerticle",
                         new DeploymentOptions()
                                 .setConfig(new JsonObject()
                                         .put("mongoConfig", mongoConfig)
                                         .put("httpPort", HTTP_PORT)
-                                        .put("guice_binder", TodoModule.class.getName()))
-                ))
-                .subscribe(
-                        result -> async.complete(),
-                        context::fail
-                );
+                                        .put("guice_binder", TodoModule.class.getName()))).toCompletable())
+                .subscribe(async::complete, context::fail);
     }
 
     @Test

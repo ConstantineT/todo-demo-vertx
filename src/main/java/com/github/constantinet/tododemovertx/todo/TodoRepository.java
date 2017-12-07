@@ -1,12 +1,15 @@
 package com.github.constantinet.tododemovertx.todo;
 
 import com.google.inject.Inject;
+import io.reactivex.Completable;
+import io.reactivex.Observable;
+import io.reactivex.Single;
 import io.vertx.core.json.JsonObject;
-import io.vertx.rxjava.ext.mongo.MongoClient;
-import rx.Observable;
-import rx.Single;
+import io.vertx.reactivex.ext.mongo.MongoClient;
 
 public class TodoRepository {
+
+    public static final String COLLECTION_NAME = "todos";
 
     private final MongoClient mongoClient;
 
@@ -17,8 +20,8 @@ public class TodoRepository {
 
     public Observable<Todo> findAll() {
         return mongoClient
-                .rxFind("todos", new JsonObject())
-                .flatMapObservable(Observable::from)
+                .rxFind(COLLECTION_NAME, new JsonObject())
+                .flatMapObservable(Observable::fromIterable)
                 .map(todo -> todo.mapTo(Todo.class));
     }
 
@@ -26,7 +29,7 @@ public class TodoRepository {
         final JsonObject query = new JsonObject().put(Todo.ID, id);
 
         return mongoClient
-                .rxFindOne("todos", query, new JsonObject())
+                .rxFindOne(COLLECTION_NAME, query, new JsonObject())
                 .map(todo -> todo != null ? todo.mapTo(Todo.class) : null);
     }
 
@@ -35,14 +38,14 @@ public class TodoRepository {
         todoJsonObject.remove(Todo.ID);
 
         return mongoClient
-                .rxInsert("todos", todoJsonObject)
+                .rxInsert(COLLECTION_NAME, todoJsonObject)
                 .map(id -> new Todo(id, todo.getDescription()));
     }
 
-    public Single<Void> delete(final String id) {
+    public Completable delete(final String id) {
         final JsonObject query = new JsonObject().put(Todo.ID, id);
 
         return mongoClient
-                .rxRemove("todos", query);
+                .rxRemove(COLLECTION_NAME, query);
     }
 }

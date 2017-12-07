@@ -2,16 +2,16 @@ package com.github.constantinet.tododemovertx.todo;
 
 import com.github.constantinet.tododemovertx.TodoModule;
 import com.google.inject.Inject;
+import io.reactivex.Observable;
+import io.reactivex.observers.DefaultObserver;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonObject;
-import io.vertx.rxjava.core.AbstractVerticle;
-import io.vertx.rxjava.core.RxHelper;
-import io.vertx.rxjava.core.http.HttpServerResponse;
-import io.vertx.rxjava.ext.web.Router;
-import io.vertx.rxjava.ext.web.RoutingContext;
-import io.vertx.rxjava.ext.web.handler.BodyHandler;
-import rx.Observable;
-import rx.Subscriber;
+import io.vertx.reactivex.core.AbstractVerticle;
+import io.vertx.reactivex.core.RxHelper;
+import io.vertx.reactivex.core.http.HttpServerResponse;
+import io.vertx.reactivex.ext.web.Router;
+import io.vertx.reactivex.ext.web.RoutingContext;
+import io.vertx.reactivex.ext.web.handler.BodyHandler;
 
 import javax.inject.Named;
 import java.util.concurrent.TimeUnit;
@@ -54,20 +54,21 @@ public class TodoVerticle extends AbstractVerticle {
 
         todoRepository.findAll()
                 .zipWith(Observable.interval(1, TimeUnit.SECONDS, RxHelper.scheduler(vertx)), (todo, l) -> todo)// simulates a delay
-                .subscribe(new Subscriber<Todo>() {
+                .subscribe(new DefaultObserver<Todo>() {
+
                     @Override
-                    public void onCompleted() {
+                    public void onNext(final Todo todo) {
+                        response.write(JsonObject.mapFrom(todo).encode() + "\n");
+                    }
+
+                    @Override
+                    public void onComplete() {
                         response.setStatusCode(200).end();
                     }
 
                     @Override
                     public void onError(final Throwable error) {
                         response.setStatusCode(500).end();
-                    }
-
-                    @Override
-                    public void onNext(final Todo todo) {
-                        response.write(JsonObject.mapFrom(todo).encode() + "\n");
                     }
                 });
     }
@@ -99,7 +100,7 @@ public class TodoVerticle extends AbstractVerticle {
 
         final String id = routingContext.pathParam("id");
         todoRepository.delete(id).subscribe(
-                todo -> response.setStatusCode(200).end(),
+                () -> response.setStatusCode(200).end(),
                 error -> response.setStatusCode(500).end()
         );
     }
